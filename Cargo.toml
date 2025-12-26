@@ -1,0 +1,25 @@
+[package]
+name = "quotes"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clap = { version = "4.5", features = ["derive"] }
+rand = "0.9"
+bincode = "2.0.1"
+chrono = "0.4.42"
+thiserror = "2"
+log = "0.4"
+serde = { version = "1.0.228", features = ["derive"] }
+crossbeam-channel = "0.5.15"
+strum = { version = "0.26", features = ["derive"] }
+strum_macros = "0.26"
+
+
+[[bin]]
+name = "quote_server"
+path = "bin/quote_server/main.rs"
+
+[[bin]]
+name = "quote_client"
+path = "bin/quote_client/main.rs"
