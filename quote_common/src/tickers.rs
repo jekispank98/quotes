@@ -1,15 +1,12 @@
-//! Ticker symbols and helpers for parsing them from files and CLI.
-//!
-//! The `Ticker` enum covers a set of common symbols and supports parsing from
-//! strings (case-insensitive) as well as `clap` value enumeration for CLI options.
-//! The `TickerParser` trait adds a convenience method to parse tickers from any
-//! `BufRead` source line-by-line.
-use crate::error::ParserError;
+//! Ticker symbols and helpers shared between client and server.
+
 use bincode::{Decode, Encode};
 use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 use std::io::BufRead;
-use strum::{Display, EnumString};
+use strum_macros::{Display, EnumString};
+
+use crate::error::ParserError;
 
 /// Trait providing file parsing for tickers.
 pub trait TickerParser {
@@ -27,16 +24,13 @@ impl TickerParser for Ticker {
         for line_result in reader.lines() {
             let line = line_result.map_err(ParserError::Io)?;
             let trimmed_line = line.trim();
-            println!("trimmed_line: {}", trimmed_line);
             if trimmed_line.is_empty() {
                 continue;
             }
 
             match trimmed_line.parse::<Self>() {
                 Ok(ticker) => tickers.push(ticker),
-                Err(e) => {
-                    return Err(ParserError::ParseTickersFile(String::from(e.to_string())));
-                }
+                Err(e) => return Err(ParserError::ParseTickersFile(e.to_string())),
             }
         }
         Ok(tickers)
@@ -44,11 +38,21 @@ impl TickerParser for Ticker {
 }
 
 /// Set of supported ticker symbols.
-///
-/// Note: We intentionally don't document each variant to keep the docs concise.
-/// Variant-level missing docs are allowed for this enum.
 #[allow(missing_docs)]
-#[derive(Debug, Clone, Decode, Encode, Serialize, Deserialize, ValueEnum, Display, EnumString)]
+#[derive(
+    Debug,
+    Clone,
+    Decode,
+    Encode,
+    Serialize,
+    Deserialize,
+    ValueEnum,
+    Display,
+    EnumString,
+    Hash,
+    Eq,
+    PartialEq,
+)]
 #[clap(rename_all = "lower")]
 #[strum(ascii_case_insensitive)]
 pub enum Ticker {

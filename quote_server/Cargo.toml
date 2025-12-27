@@ -1,0 +1,18 @@
+[package]
+name = "quote_server"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+quote_common = { path = "../quote_common" }
+rand = "0.9"
+bincode = "2.0.1"
+chrono = "0.4.42"
+thiserror = "2"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = { workspace = true }
+log = { workspace = true }
+env_logger = { workspace = true }
+crossbeam-channel = "0.5.15"
+strum = { version = "0.26", features = ["derive"] }
+strum_macros = "0.26"

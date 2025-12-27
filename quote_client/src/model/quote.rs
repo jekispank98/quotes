@@ -1,10 +1,10 @@
 //! Quote payload received from the server.
 //!
-//! Quotes are sent as `bincode`-encoded messages over UDP and decoded by the client.
-use bincode::{Decode, Encode};
+//! Quotes are sent as JSON-encoded messages over UDP and decoded by the client via `serde_json`.
+use serde::Deserialize;
 
 /// Market quote data for a single ticker.
-#[derive(Debug, Clone, Encode, Decode)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Quote {
     /// Ticker symbol (e.g., `AAPL`).
     pub ticker: String,

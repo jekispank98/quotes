@@ -16,8 +16,9 @@
 //! - Broadcast is best-effort: if sending to a client fails, that client is removed.
 
 use crate::model::quote::Quote;
-use crate::model::tickers::Ticker;
+use quote_common::tickers::Ticker;
 use crossbeam_channel::Sender;
+use log::info;
 use std::collections::HashMap;
 use std::thread;
 use std::time::Duration;
@@ -51,15 +52,15 @@ impl QuoteGenerator {
             let mut current_prices: HashMap<Ticker, f64> =
                 tickers.iter().map(|t| (t.clone(), initial_price)).collect();
 
-            println!(
-                "🏭 Market Generator started (Thread ID: {:?})",
+            info!(
+                "Market Generator started (Thread ID: {:?})",
                 thread::current().id()
             );
 
             loop {
                 while let Ok(new_client_tx) = subscribe_rx.try_recv() {
                     clients.push(new_client_tx);
-                    println!(
+                    info!(
                         "Generator: New client added. Total clients: {}",
                         clients.len()
                     );

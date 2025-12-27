@@ -21,6 +21,7 @@
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::time::{Duration, Instant};
+use log::debug;
 
 /// Internal bookkeeping for a client connection.
 ///
@@ -65,9 +66,6 @@ impl PingMonitor {
         let mut timed_out = Vec::new();
 
         for (addr, conn) in &mut self.clients {
-            println!("addr: {:?}", addr);
-            println!("conn: {:?}", conn.last_ping);
-            println!("is active: {:?}", conn.is_active);
             if conn.is_active && now.duration_since(conn.last_ping) > self.timeout {
                 conn.is_active = false;
                 timed_out.push(*addr);

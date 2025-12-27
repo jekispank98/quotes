@@ -22,34 +22,32 @@
 //! Network protocol (high‑level):
 //! - Bind address: `0.0.0.0:8080` (see `BIND_ADDRESS`).
 //! - Client sends a subscription command (header like `J_QUOTE`) with a list of tickers.
-//! - Server spawns a stream thread for that client and starts sending binary‑encoded quote
-//!   payloads (`Quote::to_bytes()`) to the client's `SocketAddr`.
+//! - Server spawns a stream thread for that client and starts sending JSON‑encoded quote
+//!   payloads to the client's `SocketAddr`.
 //!
 //! Note: This file only orchestrates; details such as the exact command format, `Quote`
 //! serialization, and ticker parsing live under the `model` and `receiver` modules.
 #![warn(missing_docs)]
-use crate::error::ParserError;
-use crate::model::command::Command;
 use crate::model::ping_monitor::PingMonitor;
 use crate::model::quote_generator::{QuoteEvent, QuoteGenerator};
-use crate::model::tickers::Ticker;
 use crate::receiver::QuoteReceiver;
 use crate::udp_listener::UdpPingListener;
-use crossbeam_channel::{select, unbounded, Receiver, Sender};
-use result::Result;
+use crossbeam_channel::{Receiver, Sender, select, unbounded};
+use log::{error, info, warn};
+use quote_common::ParserError;
+use quote_common::Result;
+use quote_common::command::Command;
+use quote_common::net::{COMMAND_PORT, DATA_PORT};
+use quote_common::tickers::Ticker;
 use std::collections::HashMap;
 use std::net::{SocketAddr, UdpSocket};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-mod error;
 pub mod model;
 mod receiver;
-mod result;
 mod udp_listener;
 
-/// Default UDP bind address for the quote server.
-const BIND_ADDRESS: &str = "127.0.0.1:8080";
 /// Stream task for a single client.
 ///
 /// Listens for quote events on `data_rx`, filters them by the client's `tickers`, and
@@ -75,16 +73,23 @@ pub fn handle_client_stream(
             recv(data_rx) -> msg => match msg {
                 Ok(QuoteEvent::Quote(quote)) => {
                     if tickers_str.contains(&quote.ticker) {
-                        let data = quote.to_bytes();
-                        if let Err(e) = socket.send_to(&data, target_addr) {
-                            eprintln!("Failed to send UDP packet to {}: {}", target_addr, e);
-                            break;
+                        match quote.to_json_bytes() {
+                            Ok(data) => {
+                                if let Err(e) = socket.send_to(&data, target_addr) {
+                                    error!("Failed to send UDP packet to {}: {}", target_addr, e);
+                                    break;
+                                }
+                            }
+                            Err(e) => {
+                                error!("Failed to serialize quote to JSON: {}", e);
+                                break;
+                            }
                         }
                     }
                 },
                 Ok(QuoteEvent::Shutdown) => break,
                 Err(e) => {
-                    println!("Ошибка при получении сообщения: {}", e);
+                    error!("Ошибка при получении сообщения: {}", e);
                     break;
                 },
             }
@@ -94,36 +99,27 @@ pub fn handle_client_stream(
 }
 
 fn main() -> Result<(), ParserError> {
-    /// Common UDP socket for data & pings
-    let udp_socket = Arc::new(UdpSocket::bind("0.0.0.0:8081")?);
-    println!("UDP сокет создан на порту: {}", udp_socket.local_addr()?);
-
-    /// Clone socket for ping-listener
+    init_logger();
+    let udp_socket = Arc::new(UdpSocket::bind(format!("0.0.0.0:{}", DATA_PORT))?);
+    info!("UDP socket created on: {}", udp_socket.local_addr()?);
     let ping_socket = Arc::clone(&udp_socket);
-
-    /// Ping's monitor
     let ping_monitor = Arc::new(Mutex::new(PingMonitor::new(5)));
     let (stop_tx, stop_rx) = unbounded::<SocketAddr>();
-
-    /// Thread to listen pings
     let ping_monitor_clone = Arc::clone(&ping_monitor);
     thread::spawn(move || {
         UdpPingListener::start(ping_socket, ping_monitor_clone);
     });
-
-    /// Thread to check timeout
     let stop_tx_clone = stop_tx.clone();
     let ping_monitor_for_checker = Arc::clone(&ping_monitor);
     thread::spawn(move || {
         start_ping_monitor(ping_monitor_for_checker, stop_tx_clone);
     });
 
-    /// Command receiver
     let (cmd_tx, cmd_rx) = unbounded::<(Command, SocketAddr)>();
-    let tcp_receiver = QuoteReceiver::new(BIND_ADDRESS)?;
+    let tcp_receiver = QuoteReceiver::new(&format!("0.0.0.0:{}", COMMAND_PORT))?;
     thread::spawn(move || {
         if let Err(e) = tcp_receiver.receive_loop_with_channel(cmd_tx) {
-            eprintln!("Receiver loop failed: {:?}", e);
+            error!("Receiver loop failed: {:?}", e);
         };
     });
 
@@ -137,7 +133,7 @@ fn main() -> Result<(), ParserError> {
                 let (client_data_tx, client_data_rx) = unbounded::<QuoteEvent>();
 
                 if let Err(e) = subscription_tx.send(client_data_tx.clone()) {
-                    eprintln!("Failed to subscribe client: {}", e);
+                    error!("Failed to subscribe client: {}", e);
                     continue;
                 }
                 active_streams.insert(target_udp_addr, (shutdown_tx, client_data_tx));
@@ -153,16 +149,16 @@ fn main() -> Result<(), ParserError> {
                         client_data_rx,
                         shutdown_rx,
                     ) {
-                        eprintln!("Client stream error: {:?}", e);
+                        error!("Client stream error: {:?}", e);
                     }
                 });
-                println!("Создан стрим для клиента на UDP адресе: {}", target_udp_addr);
+                info!("A stream has been created for the client on a UDP address.: {}", target_udp_addr);
             },
 
             recv(stop_rx) -> addr => if let Ok(client_addr) = addr {
                 if let Some((shutdown_tx, _)) = active_streams.remove(&client_addr) {
                     let _ = shutdown_tx.send(());
-                    println!("Стрим для {} закрыт: таймаут пинга", client_addr);
+                    info!("Stream for {} closed: ping timeout", client_addr);
                 }
             }
         }
@@ -181,9 +177,14 @@ fn start_ping_monitor(ping_monitor: Arc<Mutex<PingMonitor>>, stop_tx: Sender<Soc
             };
             for client_addr in timed_out_clients {
                 if let Err(e) = stop_tx.send(client_addr) {
-                    eprintln!("Ошибка отправки уведомления о таймауте: {}", e);
+                    eprintln!("Error sending timeout notification: {}", e);
                 }
             }
         }
     });
+}
+fn init_logger() {
+    env_logger::Builder::from_default_env()
+        .filter_level(log::LevelFilter::Info)
+        .init();
 }
