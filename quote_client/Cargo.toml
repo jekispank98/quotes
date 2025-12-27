@@ -9,7 +9,6 @@ clap = { version = "4.5", features = ["derive"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { workspace = true }
 rand =  "0.9"
-bincode = { version = "2.0.1", features = ["derive"] }
 log = { workspace = true }
 env_logger = { workspace = true }
 chrono = "0.4.42"

@@ -28,14 +28,6 @@ pub enum ParserError {
     #[error("Parse tickers file error: {0}")]
     ParseTickersFile(String),
 
-    /// Failure while decoding with `bincode` (invalid or truncated payloads, etc.).
-    #[error("Bincode serialization/deserialization error: {0}")]
-    BincodeDecode(#[from] bincode::error::DecodeError),
-
-    /// Failure while encoding with `bincode` (I/O or serialization issues).
-    #[error("Bincode serialization/deserialization error: {0}")]
-    BincodeEncode(#[from] bincode::error::EncodeError),
-
     /// Failure while encoding/decoding JSON via serde_json.
     #[error("JSON serialization/deserialization error: {0}")]
     SerdeJson(#[from] serde_json::Error),

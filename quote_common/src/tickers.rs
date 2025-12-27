@@ -1,6 +1,5 @@
 //! Ticker symbols and helpers shared between client and server.
 
-use bincode::{Decode, Encode};
 use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 use std::io::BufRead;
@@ -42,8 +41,6 @@ impl TickerParser for Ticker {
 #[derive(
     Debug,
     Clone,
-    Decode,
-    Encode,
     Serialize,
     Deserialize,
     ValueEnum,

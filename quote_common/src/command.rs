@@ -4,8 +4,6 @@
 //! tickers or a keep-alive `PING` message. Values are serialized with `bincode`
 //! for compact transmission.
 use std::net::SocketAddr;
-
-use bincode::{Decode, Encode};
 use serde::{Deserialize, Serialize};
 
 use crate::tickers::Ticker;
@@ -19,7 +17,7 @@ pub const PING: &str = "PING";
 pub const CONNECTION: &str = "udp";
 
 /// Command payload sent between client and server.
-#[derive(Debug, Clone, Decode, Encode, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Command {
     /// Command kind. Either `J_QUOTE` or `PING`.
     pub header: String,

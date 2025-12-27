@@ -21,7 +21,6 @@
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::time::{Duration, Instant};
-use log::debug;
 
 /// Internal bookkeeping for a client connection.
 ///
@@ -41,6 +40,7 @@ pub struct PingMonitor {
 }
 
 impl PingMonitor {
+    /// Create a new instance of PingMonitor
     pub fn new(timeout_secs: u64) -> Self {
         Self {
             clients: HashMap::new(),
@@ -48,6 +48,7 @@ impl PingMonitor {
         }
     }
 
+    /// Update existing PingMonitor
     pub fn update_ping(&mut self, addr: SocketAddr) {
         let now = Instant::now();
         self.clients.entry(addr)
@@ -61,6 +62,7 @@ impl PingMonitor {
             });
     }
 
+    /// Check if timeout less max interval between pings/data
     pub fn check_timeouts(&mut self) -> Vec<SocketAddr> {
         let now = Instant::now();
         let mut timed_out = Vec::new();
@@ -75,6 +77,7 @@ impl PingMonitor {
         timed_out
     }
 
+    /// Check is client connection active
     pub fn is_client_active(&self, addr: &SocketAddr) -> bool {
         self.clients.get(addr)
             .map(|conn| conn.is_active)

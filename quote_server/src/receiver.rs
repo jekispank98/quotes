@@ -42,10 +42,8 @@ impl QuoteReceiver {
 
                     match stream.read(&mut buf) {
                         Ok(size) => {
-                            if let Ok((cmd, _consumed)) = bincode::decode_from_slice::<Command, _>(
-                                &buf[..size],
-                                bincode::config::standard(),
-                            )
+                            let cmd: Command = serde_json::from_slice(&buf[..size])
+                                .map_err(|e| format!("JSON error: {}", e))?;
                             {
                                 info!("Received command {:?}", cmd);
 

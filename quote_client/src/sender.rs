@@ -29,7 +29,7 @@ impl CommandSender {
             command.port,
             tickers_str.join(",")
         );
-        let com = bincode::encode_to_vec(command, bincode::config::standard())?;
+        let com = serde_json::to_vec(&command)?;
 
         info!("Sending command: {}", command_text.trim());
         stream.write_all(&com)?;
