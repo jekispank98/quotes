@@ -39,7 +39,7 @@ use quote_common::Result;
 use quote_common::command::Command;
 use quote_common::net::{COMMAND_PORT, DATA_PORT};
 use quote_common::tickers::Ticker;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::net::{SocketAddr, UdpSocket};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -65,14 +65,14 @@ pub fn handle_client_stream(
     data_rx: Receiver<QuoteEvent>,
     stop_rx: Receiver<()>,
 ) -> Result<(), ParserError> {
-    let tickers_str: Vec<String> = tickers.iter().map(|t| t.to_string()).collect();
+    let tickers_set: HashSet<String> = tickers.iter().map(|t| t.to_string()).collect();
 
     loop {
         select! {
             recv(stop_rx) -> _ => break,
             recv(data_rx) -> msg => match msg {
                 Ok(QuoteEvent::Quote(quote)) => {
-                    if tickers_str.contains(&quote.ticker) {
+                    if tickers_set.contains(&quote.ticker) {
                         match quote.to_json_bytes() {
                             Ok(data) => {
                                 if let Err(e) = socket.send_to(&data, target_addr) {
@@ -125,7 +125,6 @@ fn main() -> Result<(), ParserError> {
 
     let subscription_tx = QuoteGenerator::start();
     let mut active_streams: HashMap<SocketAddr, (Sender<()>, Sender<QuoteEvent>)> = HashMap::new();
-
     loop {
         select! {
             recv(cmd_rx) -> msg => if let Ok((cmd, target_udp_addr)) = msg {
@@ -158,7 +157,7 @@ fn main() -> Result<(), ParserError> {
             recv(stop_rx) -> addr => if let Ok(client_addr) = addr {
                 if let Some((shutdown_tx, _)) = active_streams.remove(&client_addr) {
                     let _ = shutdown_tx.send(());
-                    info!("Stream for {} closed: ping timeout", client_addr);
+                    info!("Stream for {} closed due to ping timeout", client_addr);
                 }
             }
         }

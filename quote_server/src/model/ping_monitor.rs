@@ -51,7 +51,8 @@ impl PingMonitor {
     /// Update existing PingMonitor
     pub fn update_ping(&mut self, addr: SocketAddr) {
         let now = Instant::now();
-        self.clients.entry(addr)
+        self.clients
+            .entry(addr)
             .and_modify(|conn| {
                 conn.last_ping = now;
                 conn.is_active = true;
@@ -65,21 +66,24 @@ impl PingMonitor {
     /// Check if timeout less max interval between pings/data
     pub fn check_timeouts(&mut self) -> Vec<SocketAddr> {
         let now = Instant::now();
+        let timeout = self.timeout;
         let mut timed_out = Vec::new();
 
-        for (addr, conn) in &mut self.clients {
-            if conn.is_active && now.duration_since(conn.last_ping) > self.timeout {
-                conn.is_active = false;
+        self.clients.retain(|addr, conn| {
+            if now.duration_since(conn.last_ping) > timeout {
                 timed_out.push(*addr);
+                false
+            } else {
+                true
             }
-        }
-
+        });
         timed_out
     }
 
     /// Check is client connection active
     pub fn is_client_active(&self, addr: &SocketAddr) -> bool {
-        self.clients.get(addr)
+        self.clients
+            .get(addr)
             .map(|conn| conn.is_active)
             .unwrap_or(false)
     }
