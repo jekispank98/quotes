@@ -36,7 +36,7 @@ impl CommandSender {
         Ok(())
     }
     pub fn start_ping_thread(
-        socket: UdpSocket,
+        socket: Arc<UdpSocket>,
         target_addr: String,
         _ping_command: Command,
         shutdown: Arc<AtomicBool>,

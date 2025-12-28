@@ -42,52 +42,30 @@ use quote_common::net::{COMMAND_PORT, DATA_PORT};
 
 /// Runs a blocking loop that receives `Quote` messages from the given UDP `socket`
 /// and prints them to stdout. Returns an error if receiving or decoding fails.
-// lib - функция start_receiver_loop
-fn start_receiver_loop(socket: UdpSocket, shutdown: Arc<AtomicBool>) -> Result<(), ParserError> {
+fn start_receiver_loop(socket: Arc<UdpSocket>, shutdown: Arc<AtomicBool>) -> Result<(), ParserError> {
     info!("Quote receiver running on: {}", socket.local_addr()?);
     let mut buf = [0u8; 2048];
 
-    loop {
+    while !shutdown.load(Ordering::Relaxed) {
         match socket.recv(&mut buf) {
             Ok(size) => {
-                // Try to decode as JSON Quote first
                 match serde_json::from_slice::<Quote>(&buf[..size]) {
                     Ok(quote) => {
-                        info!(
-                            "QUOTE: {} Price={:.2} Volume={} Time={}",
-                            quote.ticker, quote.price, quote.volume, quote.timestamp
-                        );
+                        info!("QUOTE: {} Price={:.2} Volume={} Time={}",
+                            quote.ticker, quote.price, quote.volume, quote.timestamp);
                     }
                     Err(_) => {
-                        // If not JSON, maybe ping or another control packet
-                        let message = String::from_utf8_lossy(&buf[..size]);
-                        if message.trim() == "PING" || message.contains("PING") {
-                            debug!("Received PING from server");
-                        } else {
-                            debug!("Received unknown message: {}", message);
-                        }
+                        debug!("Received non-JSON message: {}", String::from_utf8_lossy(&buf[..size]));
                     }
                 }
             }
             Err(e) => {
                 if e.kind() == ErrorKind::WouldBlock || e.kind() == ErrorKind::TimedOut {
-                    if shutdown.load(Ordering::Relaxed) {
-                        break;
-                    }
-                    continue;
-                }
-                if e.kind() == ErrorKind::ConnectionReset {
-                    if shutdown.load(Ordering::Relaxed) {
-                        break;
-                    }
                     continue;
                 }
                 error!("Receive data error: {}", e);
                 return Err(ParserError::Format(e.to_string()));
             }
-        }
-        if shutdown.load(Ordering::Relaxed) {
-            break;
         }
     }
     info!("Receiver loop stopping...");
@@ -131,7 +109,7 @@ fn main() -> Result<(), ParserError> {
 
         let tickers = Ticker::parse_from_file(buf)?;
         info!("Tickers: {:?}", tickers);
-        let client_udp_socket = UdpSocket::bind(&listen_address)?;
+        let client_udp_socket = Arc::new(UdpSocket::bind(&listen_address)?);
         client_udp_socket.set_read_timeout(Some(Duration::from_secs(5)))?;
         let client_local_addr = client_udp_socket.local_addr()?;
 
@@ -162,14 +140,13 @@ fn main() -> Result<(), ParserError> {
             }
         };
 
-        let ping_udp_socket = UdpSocket::bind("0.0.0.0:0")?;
         let ping_command = Command::new_ping(
             &client_local_addr.ip().to_string(),
             &client_local_addr.port().to_string(),
         );
 
         CommandSender::start_ping_thread(
-            ping_udp_socket,
+            client_udp_socket.clone(),
             server_udp_address.clone(),
             ping_command,
             shutdown.clone(),
@@ -183,8 +160,9 @@ fn main() -> Result<(), ParserError> {
 }
 
 fn init_logger() {
-    env_logger::Builder::from_default_env()
+    env_logger::Builder::new()
         .filter_level(log::LevelFilter::Info)
+        .parse_default_env()
         .init();
 }
 
