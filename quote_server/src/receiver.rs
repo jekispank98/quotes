@@ -1,7 +1,7 @@
 use quote_common::ParserError;
 use quote_common::command::Command;
 use crossbeam_channel::Sender;
-use log::{error, info, debug};
+use log::{error, info};
 use std::io::Read;
 use std::net::{SocketAddr, TcpListener};
 
@@ -37,27 +37,23 @@ impl QuoteReceiver {
             match stream {
                 Ok(mut stream) => {
                     let client_tcp_addr = stream.peer_addr()?;
-                    debug!("client_tcp_addr: {:?}", &client_tcp_addr);
                     let mut buf = [0u8; 1024];
 
-                    match stream.read(&mut buf) {
-                        Ok(size) => {
-                            let cmd: Command = serde_json::from_slice(&buf[..size])
-                                .map_err(|e| format!("JSON error: {}", e))?;
-                            {
-                                info!("Received command {:?}", cmd);
+                    if let Err(e) = (|| -> Result<(), Box<dyn std::error::Error>> {
+                        let size = stream.read(&mut buf)?;
+                        let cmd: Command = serde_json::from_slice(&buf[..size])
+                            .map_err(|e| format!("JSON error: {}", e))?;
 
-                                let port: u16 = cmd
-                                    .port
-                                    .parse()
-                                    .map_err(|e| format!("Invalid UDP port in command: {}", e))?
-                                    ;
-                                let target_udp_addr = SocketAddr::new(client_tcp_addr.ip(), port);
+                        info!("Received command {:?}", cmd);
 
-                                tx.send((cmd, target_udp_addr))?;
-                            }
-                        }
-                        Err(e) => error!("Read TCP error: {}", e),
+                        let port: u16 = cmd.port.parse()
+                            .map_err(|e| format!("Invalid UDP port in command: {}", e))?;
+
+                        let target_udp_addr = SocketAddr::new(client_tcp_addr.ip(), port);
+                        tx.send((cmd, target_udp_addr))?;
+                        Ok(())
+                    })() {
+                        error!("Failed to process client command from {:?}: {}", client_tcp_addr, e);
                     }
                 }
                 Err(e) => error!("TCP connection error: {}", e),
@@ -66,3 +62,4 @@ impl QuoteReceiver {
         Ok(())
     }
 }
+
