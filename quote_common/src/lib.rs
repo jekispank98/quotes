@@ -13,6 +13,7 @@ pub mod result;
 pub mod tickers;
 pub mod command;
 pub mod net;
+pub mod quote;
 
 pub use error::ParserError;
 pub use result::Result;

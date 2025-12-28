@@ -15,7 +15,7 @@
 //!   sequence of prices.
 //! - Broadcast is best-effort: if sending to a client fails, that client is removed.
 
-use crate::model::quote::Quote;
+use quote_common::quote::Quote;
 use quote_common::tickers::Ticker;
 use crossbeam_channel::Sender;
 use log::info;

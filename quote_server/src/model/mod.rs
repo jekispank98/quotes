@@ -7,6 +7,5 @@
 //! - `ping_monitor` — in-memory keep-alive tracker for client timeouts.
 //! - `quote_generator` — background data generator and `QuoteEvent` broadcasting.
 
-pub mod quote;
 pub mod ping_monitor;
 pub mod quote_generator;

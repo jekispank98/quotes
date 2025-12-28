@@ -16,7 +16,7 @@ mod model;
 mod sender;
 
 use crate::args::Args;
-use crate::model::quote::Quote;
+use quote_common::quote::Quote;
 use crate::sender::CommandSender;
 use clap::Parser;
 use log::{debug, error, info, warn};

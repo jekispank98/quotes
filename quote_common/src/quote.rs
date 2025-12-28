@@ -4,11 +4,11 @@
 //! traded price, a synthetic volume, and a millisecond UTC timestamp. This module also
 //! provides helper methods for generating synthetic prices and for encoding quotes to JSON.
 
-use quote_common::ParserError;
-use quote_common::tickers::Ticker;
-use chrono::Utc;
 use rand::Rng;
 use serde::{Serialize, Deserialize};
+use crate::ParserError;
+use crate::tickers::Ticker;
+use chrono::Utc;
 
 /// Market quote for a single ticker symbol.
 #[derive(Debug, Clone, Serialize, Deserialize)]
