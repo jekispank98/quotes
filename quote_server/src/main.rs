@@ -65,6 +65,8 @@ pub fn handle_client_stream(
     data_rx: Receiver<QuoteEvent>,
     stop_rx: Receiver<()>,
 ) -> Result<(), ParserError> {
+    // [6:non-critical] Лучше здесь использовать HashSet, иначе клиент может послать 1000000 тикеров
+    // (может даже одинаковых) и ты на него будешь тратить O(1000000) вместо O(1).
     let tickers_str: Vec<String> = tickers.iter().map(|t| t.to_string()).collect();
 
     loop {
@@ -156,9 +158,14 @@ fn main() -> Result<(), ParserError> {
             },
 
             recv(stop_rx) -> addr => if let Ok(client_addr) = addr {
+                // продолжение [1:critical] - вот здесь как-раз у тебя `client_addr` - это
+                // адрес PING-сокета от сервера, а в `active_streams` лежат адреса, на которые
+                // ты отсылаешь котировки => `.remove()` вернёт false.
                 if let Some((shutdown_tx, _)) = active_streams.remove(&client_addr) {
                     let _ = shutdown_tx.send(());
                     info!("Stream for {} closed: ping timeout", client_addr);
+                } else {
+                    panic!("Вот сюда ты не должен попадать, но попадаешь при выключении клиента")
                 }
             }
         }

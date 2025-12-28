@@ -3,6 +3,10 @@
 //! Quotes are sent as JSON-encoded messages over UDP and decoded by the client via `serde_json`.
 use serde::Deserialize;
 
+// [2:critical] эта структура есть и в клиенте, и в сервере. Давай перенесём её в quote_common.
+// В задании есть пункт "Архитектура и организация кода: логическое разделение на модули/функции,
+// отсутствие дублирования кода."
+
 /// Market quote data for a single ticker.
 #[derive(Debug, Clone, Deserialize)]
 pub struct Quote {

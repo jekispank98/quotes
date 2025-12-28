@@ -70,6 +70,10 @@ impl PingMonitor {
         for (addr, conn) in &mut self.clients {
             if conn.is_active && now.duration_since(conn.last_ping) > self.timeout {
                 conn.is_active = false;
+                // [3:non-critical] заметь что записи из `self.clients` у тебя никогда
+                // не удаляются - со временем количество записей будет возрастать, сервер
+                // будет замедляться, память будет утекать. Подумай, как здесь лучше
+                // организовать удаление записей.
                 timed_out.push(*addr);
             }
         }

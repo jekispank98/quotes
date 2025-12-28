@@ -162,6 +162,18 @@ fn main() -> Result<(), ParserError> {
             }
         };
 
+        // [1:critical]: тут ты создаёшь новый UDP сокет. Сервер отсылает quotes на один сокет,
+        // а получает PING от другого. Тз-за этого механизм PING работает наполовину - ты
+        // отсылаешь котировки в первый сокет (`client_udp_socket`), а детектишь timeout для
+        // второго (`ping_udp_socket`). Когда клиент отключается, "убивается" этот второй
+        // сокет, а с первым сервер продолжает работать.
+        // В итоге, т.к. у тебя 3 набора клиентов в сервере (Первый - `PingMonitor::clients`,
+        // сюда кладутся `ping_udp_socket`; Второй - `active_streams` в `main` сервера; Третий
+        // - `clients` в `QuoteGenerator::start`). Вот этот средний никогда не очищается.
+        //
+        // Решение - либо позвать `UdpSocket::try_clone`, либо лучше - передавать `&UdpSocket`
+        // или `Arc<UdpSocket>` (на один и тот же сокет) в `start_ping_thread` и в
+        // `start_receiver_loop`.
         let ping_udp_socket = UdpSocket::bind("0.0.0.0:0")?;
         let ping_command = Command::new_ping(
             &client_local_addr.ip().to_string(),
@@ -176,6 +188,8 @@ fn main() -> Result<(), ParserError> {
         );
 
         info!("Client is running. Press Ctrl+C to exit.");
+        // [7:non-critical] Для корректного graceful exit здесь лучше дожидаться остановки других
+        // потоков, а не только выходить из основного.
         return start_receiver_loop(client_udp_socket, shutdown);
     }
 
@@ -183,6 +197,10 @@ fn main() -> Result<(), ParserError> {
 }
 
 fn init_logger() {
+    // [8:non-critical] Ты сначала заполняешь `Builder` значениями из переменной окружения `RUST_LOG`
+    // а потом перетираешь их `.filter_level(log::LevelFilter::Info)`. Лучше либо использовать только
+    // `from_default_env`, либо сначала делать `.filter_level(log::LevelFilter::Info)`, а потом уже
+    // `parse_default_env`.
     env_logger::Builder::from_default_env()
         .filter_level(log::LevelFilter::Info)
         .init();

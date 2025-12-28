@@ -29,6 +29,8 @@ impl CommandSender {
             command.port,
             tickers_str.join(",")
         );
+        // [4:non-critical] Саму команду STREAM необязательно оборачивать в JSON :) Только котировки
+        // но это допускается.
         let com = serde_json::to_vec(&command)?;
 
         info!("Sending command: {}", command_text.trim());

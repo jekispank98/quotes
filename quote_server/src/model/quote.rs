@@ -10,6 +10,10 @@ use chrono::Utc;
 use rand::Rng;
 use serde::{Serialize, Deserialize};
 
+// [2:critical] эта структура есть и в клиенте, и в сервере. Давай перенесём её в quote_common.
+// В задании есть пункт "Архитектура и организация кода: логическое разделение на модули/функции,
+// отсутствие дублирования кода."
+
 /// Market quote for a single ticker symbol.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Quote {
